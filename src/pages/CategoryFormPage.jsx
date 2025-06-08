@@ -1,80 +1,122 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import axios from "axios";
 import HeaderComponent from "../components/HeaderComponent";
 
 
 function CategoryFormPage() {
-  const navigate = useNavigate();
-  const { idcategory } = useParams();
-  const isEdit = Boolean(idcategory);
+    const urlApi = 'http://localhost:8000/series/api/v1/categories/';
 
-  const [data, setData] = useState({ nom: "" });
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [loading, setLoading] = useState(false); 
+    const [error, setError] = useState('');
+    
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const isEditMode = !!id;
 
-  useEffect(() => {
-    const savedCategories = JSON.parse(localStorage.getItem("categories")) || [];
-    if (isEdit) {
-      const category = savedCategories.find(c => c.cod === parseInt(idcategory));
-      if (category) {
-        setData({ nom: category.nom });
-      }
-    }
-  }, [idcategory]);
+    useEffect(() => {
+        if (isEditMode) {
+            setLoading(true);
+            axios.get(`${urlApi}${id}/`)
+                .then(response => {
+                    const { name, description } = response.data;
+                    setName(name);
+                    setDescription(description || ''); 
+                    setLoading(false);
+                })
+                .catch(() => {
+                    setError('No se pudo cargar la categoría para editar.');
+                    setLoading(false);
+                });
+        }
+    }, [id, isEditMode]); 
 
-  const onChangeNombre = (e) => {
-    setData({ ...data, nom: e.target.value });
-  };
+    const handleSubmit = (e) => {
+        e.preventDefault();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const savedCategories = JSON.parse(localStorage.getItem("categories")) || [];
-    if (isEdit) {
-      const updated = savedCategories.map(cat =>
-        cat.cod === parseInt(idcategory) ? { ...cat, nom: data.nom } : cat
-      );
-      localStorage.setItem("categories", JSON.stringify(updated));
-    } else {
-      const newCod = savedCategories.length > 0 ? Math.max(...savedCategories.map(c => c.cod)) + 1 : 1;
-      savedCategories.push({ cod: newCod, nom: data.nom });
-      localStorage.setItem("categories", JSON.stringify(savedCategories));
-    }
+        if (!name.trim()) {
+            setError('El nombre de la categoría es obligatorio.');
+            return;
+        }
 
-    // Mostrar datos como pide el laboratorio
-    console.log("Datos enviados:", data);
-    navigate("/categories");
-  };
+        setLoading(true);
+        setError('');
 
-  return (
-    <>
-      <HeaderComponent />
-      <div className="container mt-3">
-        <div className="d-flex justify-content-between border-bottom pb-3 mb-3">
-          <h3>{isEdit ? "Editar" : "Nueva"} Categoría</h3>
-          <button
-            onClick={() => navigate('/categories')}
-            className="btn btn-secondary"
-          >
-            Cancelar
-          </button>
+        const categoryData = { name, description };
+
+        const request = isEditMode
+            ? axios.put(`${urlApi}${id}/`, categoryData) 
+            : axios.post(urlApi, categoryData);
+
+        request
+            .then(() => {
+                setLoading(false);
+                navigate('/categories'); 
+            })
+            .catch((err) => {
+                console.error("Error al guardar la categoría:", err);
+                setError('No se pudo guardar la categoría. Por favor, intenta de nuevo.');
+                setLoading(false);
+            });
+    };
+
+    return (
+        <div className="container mt-4">
+            <h2>{isEditMode ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
+            
+            {error && <div className="alert alert-danger">{error}</div>}
+
+            {loading && !error ? ( 
+                <div className="d-flex justify-content-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            ) : (
+                <form onSubmit={handleSubmit}>
+                    <div className="mb-3">
+                        <label htmlFor="categoryName" className="form-label">Nombre</label>
+                        <input
+                            id="categoryName"
+                            type="text"
+                            className="form-control"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className="mb-3">
+                        <label htmlFor="categoryDescription" className="form-label">Descripción</label>
+                        <textarea
+                            id="categoryDescription"
+                            className="form-control"
+                            rows="3"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                        />
+                    </div>
+                    <div className="d-flex justify-content-end gap-2"> {}
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => navigate('/categories')}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={loading}
+                        >
+                            {loading ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Crear Categoría')}
+                        </button>
+                    </div>
+                </form>
+            )}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="nombre" className="form-label">Nombre</label>
-            <input
-              type="text"
-              className="form-control"
-              id="nombre"
-              required
-              value={data.nom}
-              onChange={onChangeNombre}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary">Guardar</button>
-        </form>
-      </div>
-    </>
-  );
+    );
 }
 
 export default CategoryFormPage;
-
-

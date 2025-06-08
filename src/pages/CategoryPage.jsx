@@ -1,86 +1,97 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import HeaderComponent from "../components/HeaderComponent";
+import CategoryComponent from "../components/CategoryComponent";
 
 function CategoryPage() {
 
-    const urlApi = 'http://localhost:8000/series/api/v1/categories';
+    const urlApi = 'http://localhost:8000/series/api/v1/categories/';
+
     const [categories, setCategories] = useState([]);
-
-    // Inicializar categorías
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    
+    const navigate = useNavigate();
+    
     useEffect(() => {
-        const savedCategories = JSON.parse(localStorage.getItem("categories"));
-        
-        // Si no hay categorías guardadas, inicializar con las por defecto
-        if (!savedCategories || savedCategories.length === 0) {
-            const defaultCategories = [
-                { cod: 1, nom: "Horror" },
-                { cod: 2, nom: "Comedy" },
-                { cod: 3, nom: "Action" },
-                { cod: 4, nom: "Drama" }
-            ];
-            localStorage.setItem("categories", JSON.stringify(defaultCategories));
-            setCategories(defaultCategories);
-        } else {
-            setCategories(savedCategories);
-        }
+        fetchCategories();
     }, []);
-
-    const handleDelete = (cod) => {
-        const updatedCategories = categories.filter(cat => cat.cod !== cod);
-        localStorage.setItem("categories", JSON.stringify(updatedCategories));
-        setCategories(updatedCategories);
+    
+    const fetchCategories = () => {
+        setLoading(true);
+        axios.get(urlApi)
+            .then(response => {
+                setCategories(response.data);
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error('Error al obtener categorías:', error);
+                setError('No se pudieron cargar las categorías. Por favor, intenta de nuevo.');
+                setLoading(false);
+            });
     };
-
-    const loadData = async () => {
-        const resp = await axios.get(urlApi);
-        console.log(resp.data);
-        setCategories(resp.data);
+    
+    const handleDelete = (id) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta categoría?')) {
+            axios.delete(`${urlApi}${id}/`) 
+                .then(() => {
+                    fetchCategories();
+                })
+                .catch(error => {
+                    console.error('Error al eliminar categoría:', error);
+                    setError('No se pudo eliminar la categoría. Por favor, intenta de nuevo.');
+                });
+        }
     };
 
     return (
-        <>
-            <HeaderComponent />
-            <div className="container mt-3">
-                <div className="d-flex justify-content-between border-bottom pb-3 mb-3">
-                    <h3>Categorías</h3>
-                    <Link to="/categories/new" className="btn btn-primary">Nueva Categoría</Link>
-                </div>
-                
-                <table className="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {categories.map(cat => (
-                            <tr key={cat.cod}>
-                                <td>{cat.cod}</td>
-                                <td>{cat.nom}</td>
-                                <td>
-                                    <Link 
-                                        to={`/categories/edit/${cat.cod}`} 
-                                        className="btn btn-sm btn-warning me-2"
-                                    >
-                                        Editar
-                                    </Link>
-                                    <button
-                                        onClick={() => handleDelete(cat.cod)}
-                                        className="btn btn-sm btn-danger"
-                                    >
-                                        Eliminar
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        <div className="container mt-4">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h1>Categorías</h1>
+                <button 
+                    className="btn btn-primary"
+                    onClick={() => navigate('/categories/new')}
+                >
+                    Nueva Categoría
+                </button>
             </div>
-        </>
+            
+            {error && (
+                <div className="alert alert-danger" role="alert">
+                    {error}
+                </div>
+            )}
+            
+            {loading ? (
+                <div className="d-flex justify-content-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            ) : (
+                <div className="row">
+                    {categories.length === 0 ? (
+                        <div className="col-12">
+                            <div className="alert alert-info">
+                                No hay categorías disponibles. ¡Crea una nueva!
+                            </div>
+                        </div>
+                    ) : (
+                        categories.map(category => (
+                            <div className="col-md-4 mb-3" key={category.id}>
+                                <CategoryComponent 
+                                    codigo={category.id}
+                                    nombre={category.name}
+                                    descripcion={category.description}
+                                    onDelete={() => handleDelete(category.id)}
+                                />
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
     );
 }
 
